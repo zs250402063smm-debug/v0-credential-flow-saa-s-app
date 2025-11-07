@@ -26,23 +26,39 @@ export default async function AdminPage() {
     redirect("/admin/company")
   }
 
-  const [providersResult, documentsResult, licensesResult] = await Promise.all([
-    supabase
-      .from("providers")
-      .select(
-        `
-      *,
-      profiles:user_id (
-        full_name,
-        email
+  // Fetch providers through provider_company_links
+  const { data: providerLinks } = await supabase
+    .from("provider_company_links")
+    .select(`
+      provider_id,
+      status,
+      approved_at,
+      providers:provider_id (
+        id,
+        npi,
+        specialty,
+        status,
+        user_id,
+        profiles:user_id (
+          full_name,
+          email
+        )
       )
-    `,
-      )
-      .eq("company_id", profile.company_id),
-    supabase
-      .from("documents")
-      .select(
-        `
+    `)
+    .eq("company_id", profile.company_id)
+    .eq("status", "approved")
+
+  // Transform provider links to match expected format
+  const providers =
+    providerLinks?.map((link) => ({
+      ...link.providers,
+      link_status: link.status,
+      approved_at: link.approved_at,
+    })) || []
+
+  const { data: documents } = await supabase
+    .from("documents")
+    .select(`
       *,
       providers:provider_id (
         npi,
@@ -52,13 +68,12 @@ export default async function AdminPage() {
           email
         )
       )
-    `,
-      )
-      .eq("company_id", profile.company_id),
-    supabase
-      .from("licenses")
-      .select(
-        `
+    `)
+    .eq("company_id", profile.company_id)
+
+  const { data: licenses } = await supabase
+    .from("licenses")
+    .select(`
       *,
       providers:provider_id (
         npi,
@@ -68,16 +83,14 @@ export default async function AdminPage() {
           email
         )
       )
-    `,
-      )
-      .eq("company_id", profile.company_id),
-  ])
+    `)
+    .eq("company_id", profile.company_id)
 
   return (
     <AdminDashboard
-      providers={providersResult.data || []}
-      documents={documentsResult.data || []}
-      licenses={licensesResult.data || []}
+      providers={providers || []}
+      documents={documents || []}
+      licenses={licenses || []}
       userEmail={user.email || ""}
       companyId={profile.company_id}
     />

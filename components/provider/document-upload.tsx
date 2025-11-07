@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,11 @@ interface DocumentUploadProps {
   providerId: string
 }
 
+type Company = {
+  id: string
+  name: string
+}
+
 export function DocumentUpload({ providerId }: DocumentUploadProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -25,6 +30,48 @@ export function DocumentUpload({ providerId }: DocumentUploadProps) {
   const [file, setFile] = useState<File | null>(null)
   const [documentType, setDocumentType] = useState<string>("")
   const [dragActive, setDragActive] = useState(false)
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("")
+  const [approvedCompanies, setApprovedCompanies] = useState<Company[]>([])
+  const [loadingCompanies, setLoadingCompanies] = useState(true)
+
+  useEffect(() => {
+    const fetchApprovedCompanies = async () => {
+      const supabase = createClient()
+      try {
+        const { data: links, error } = await supabase
+          .from("provider_company_links")
+          .select("company_id, companies(id, name)")
+          .eq("provider_id", providerId)
+          .eq("status", "approved")
+
+        if (error) throw error
+
+        const companies =
+          links
+            ?.map((link: any) => ({
+              id: link.companies.id,
+              name: link.companies.name,
+            }))
+            .filter((c): c is Company => c.id && c.name) || []
+
+        setApprovedCompanies(companies)
+        if (companies.length === 1) {
+          setSelectedCompanyId(companies[0].id)
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching companies:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your companies",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingCompanies(false)
+      }
+    }
+
+    fetchApprovedCompanies()
+  }, [providerId, toast])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -72,6 +119,16 @@ export function DocumentUpload({ providerId }: DocumentUploadProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!selectedCompanyId) {
+      toast({
+        title: "Company Required",
+        description: "Please select a company for this document",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!file || !documentType) {
       toast({
         title: "Missing Information",
@@ -100,6 +157,7 @@ export function DocumentUpload({ providerId }: DocumentUploadProps) {
 
       const { error: dbError } = await supabase.from("documents").insert({
         provider_id: providerId,
+        company_id: selectedCompanyId,
         document_type: documentType,
         file_name: file.name,
         file_path: fileName,
@@ -126,6 +184,45 @@ export function DocumentUpload({ providerId }: DocumentUploadProps) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (!loadingCompanies && approvedCompanies.length === 0) {
+    return (
+      <div className="flex min-h-screen flex-col bg-gradient-to-br from-background via-background to-[#0D173C]/5">
+        <header className="border-b border-[#4ea8de]/20 bg-background/95 backdrop-blur">
+          <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+            <Link href="/provider" className="flex items-center gap-2 transition-transform hover:scale-105">
+              <div className="rounded-lg bg-gradient-to-br from-[#0D173C] to-[#4ea8de] p-1.5">
+                <Shield className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-lg font-bold sm:text-xl">CredentialFlow</span>
+            </Link>
+            <Link href="/provider">
+              <Button variant="ghost" size="sm" className="transition-all hover:scale-105">
+                <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back to Dashboard</span>
+              </Button>
+            </Link>
+          </div>
+        </header>
+
+        <main className="flex flex-1 items-center justify-center p-4 sm:p-6">
+          <Card className="w-full max-w-2xl animate-fade-in shadow-lg border-[#4ea8de]/20">
+            <CardHeader>
+              <CardTitle>No Company Access</CardTitle>
+              <CardDescription>You need to be approved by a company before you can upload documents.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/provider/join-company">
+                <Button className="w-full bg-gradient-to-r from-[#0D173C] to-[#4ea8de] text-white">
+                  Request Company Access
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -162,6 +259,28 @@ export function DocumentUpload({ providerId }: DocumentUploadProps) {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="company">Company *</Label>
+                <Select
+                  value={selectedCompanyId}
+                  onValueChange={setSelectedCompanyId}
+                  required
+                  disabled={loadingCompanies}
+                >
+                  <SelectTrigger className="transition-all focus:border-[#4ea8de]">
+                    <SelectValue placeholder={loadingCompanies ? "Loading companies..." : "Select company"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {approvedCompanies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Select which company this document is for</p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="documentType">Document Type *</Label>
                 <Select value={documentType} onValueChange={setDocumentType} required>
