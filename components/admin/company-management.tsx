@@ -1,14 +1,26 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Building2, Copy, Check, UserCheck, UserX, Shield, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { subscribeToProviderRequests } from "@/lib/supabase/realtime"
+import { createClient } from "@/lib/supabase/client"
 
 type Company = {
   id: string
@@ -62,6 +74,91 @@ export function CompanyManagement({
   const [copied, setCopied] = useState(false)
   const [pendingRequests, setPendingRequests] = useState(initialRequests)
   const [approvedProviders, setApprovedProviders] = useState(initialApprovedProviders)
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false)
+  const [providerToRemove, setProviderToRemove] = useState<{ id: string; name: string } | null>(null)
+
+  useEffect(() => {
+    if (!company?.id) return
+
+    const channel = subscribeToProviderRequests(company.id, async () => {
+      const supabase = createClient()
+
+      const { data: pending } = await supabase
+        .from("provider_company_links")
+        .select(
+          `
+          id,
+          provider_id,
+          company_id,
+          status,
+          requested_at,
+          request_note,
+          provider:provider_id (
+            id,
+            profiles:user_id (
+              email,
+              full_name
+            )
+          )
+        `,
+        )
+        .eq("company_id", company.id)
+        .eq("status", "pending")
+        .order("requested_at", { ascending: false })
+
+      const { data: approved } = await supabase
+        .from("provider_company_links")
+        .select(
+          `
+          id,
+          provider_id,
+          company_id,
+          status,
+          approved_at,
+          provider:provider_id (
+            id,
+            profiles:user_id (
+              email,
+              full_name
+            )
+          )
+        `,
+        )
+        .eq("company_id", company.id)
+        .eq("status", "approved")
+        .order("approved_at", { ascending: false })
+
+      if (pending) {
+        setPendingRequests(
+          pending.map((req: any) => ({
+            ...req,
+            provider: {
+              id: req.provider.id,
+              email: req.provider.profiles?.email || "",
+              full_name: req.provider.profiles?.full_name || "",
+            },
+          })),
+        )
+      }
+
+      if (approved) {
+        setApprovedProviders(
+          approved.map((prov: any) => ({
+            ...prov,
+            provider: {
+              id: prov.provider.id,
+              email: prov.provider.profiles?.email || "",
+              full_name: prov.provider.profiles?.full_name || "",
+            },
+          })),
+        )
+      }
+    })
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [company?.id])
 
   const handleCreateCompany = async () => {
     if (!companyName.trim()) {
@@ -100,13 +197,6 @@ export function CompanyManagement({
 
   const handleApproveRequest = async (requestId: string, providerId: string) => {
     try {
-      console.log("[v0] Approving request:", {
-        requestId,
-        providerId,
-        companyId: company?.id,
-        adminId,
-      })
-
       const response = await fetch("/api/companies/approve-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -115,20 +205,6 @@ export function CompanyManagement({
 
       if (!response.ok) throw new Error("Failed to approve request")
 
-      const approvedLink = await response.json()
-
-      setPendingRequests((prev) => prev.filter((req) => req.id !== requestId))
-      setApprovedProviders((prev) => [
-        ...prev,
-        {
-          ...approvedLink,
-          provider: pendingRequests.find((req) => req.id === requestId)?.provider || {
-            id: providerId,
-            email: "",
-            full_name: "",
-          },
-        },
-      ])
       toast.success("Provider request approved!")
     } catch (error) {
       console.error("[v0] Error approving request:", error)
@@ -138,8 +214,6 @@ export function CompanyManagement({
 
   const handleRejectRequest = async (requestId: string) => {
     try {
-      console.log("[v0] Rejecting request:", { requestId, adminId })
-
       const response = await fetch("/api/companies/reject-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -148,7 +222,6 @@ export function CompanyManagement({
 
       if (!response.ok) throw new Error("Failed to reject request")
 
-      setPendingRequests((prev) => prev.filter((req) => req.id !== requestId))
       toast.success("Provider request rejected")
     } catch (error) {
       console.error("[v0] Error rejecting request:", error)
@@ -156,28 +229,26 @@ export function CompanyManagement({
     }
   }
 
-  const handleRemoveProvider = async (linkId: string, providerName: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to remove ${providerName} from your company? They will need to request access again.`,
-      )
-    ) {
-      return
-    }
+  const handleRemoveProviderClick = (linkId: string, providerName: string) => {
+    setProviderToRemove({ id: linkId, name: providerName })
+    setShowRemoveDialog(true)
+  }
+
+  const handleRemoveProviderConfirm = async () => {
+    if (!providerToRemove) return
 
     try {
-      console.log("[v0] Removing provider:", { linkId, adminId })
-
       const response = await fetch("/api/companies/remove-provider", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linkId }),
+        body: JSON.stringify({ linkId: providerToRemove.id }),
       })
 
       if (!response.ok) throw new Error("Failed to remove provider")
 
-      setApprovedProviders((prev) => prev.filter((provider) => provider.id !== linkId))
       toast.success("Provider removed successfully")
+      setShowRemoveDialog(false)
+      setProviderToRemove(null)
     } catch (error) {
       console.error("[v0] Error removing provider:", error)
       toast.error("Failed to remove provider")
@@ -288,9 +359,10 @@ export function CompanyManagement({
                   </p>
                 </div>
                 <Button
-                  onClick={() => handleRemoveProvider(provider.id, provider.provider.full_name || "this provider")}
+                  onClick={() => handleRemoveProviderClick(provider.id, provider.provider.full_name || "this provider")}
                   size="sm"
                   variant="destructive"
+                  className="bg-red-600 hover:bg-red-700 text-white"
                 >
                   <UserX className="h-4 w-4 mr-2" />
                   Remove
@@ -344,6 +416,25 @@ export function CompanyManagement({
           </div>
         )}
       </Card>
+
+      {/* AlertDialog for provider removal confirmation */}
+      <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Provider</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {providerToRemove?.name} from your company? They will need to request
+              access again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemoveProviderConfirm} className="bg-red-600 hover:bg-red-700 text-white">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

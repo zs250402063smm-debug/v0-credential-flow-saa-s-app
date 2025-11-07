@@ -38,7 +38,6 @@ export function AdminDashboard({
 
   useEffect(() => {
     const providersChannel = subscribeToProviders(companyId, () => {
-      // Refetch providers when changes occur
       const supabase = createClient()
       supabase
         .from("providers")

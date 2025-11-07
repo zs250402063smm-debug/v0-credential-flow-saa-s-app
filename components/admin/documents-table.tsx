@@ -85,8 +85,6 @@ export function DocumentsTable({ documents }: DocumentsTableProps) {
         title: "Document Approved",
         description: "The document has been successfully approved.",
       })
-
-      router.refresh()
     } catch (error) {
       console.error("[v0] Approve error:", error)
       toast({
@@ -129,7 +127,6 @@ export function DocumentsTable({ documents }: DocumentsTableProps) {
       setShowRejectDialog(false)
       setDocumentToReject(null)
       setRejectNotes("")
-      router.refresh()
     } catch (error) {
       console.error("[v0] Reject error:", error)
       toast({
@@ -179,8 +176,6 @@ export function DocumentsTable({ documents }: DocumentsTableProps) {
         title: "Document Reverted",
         description: "The document status has been reset to pending.",
       })
-
-      router.refresh()
     } catch (error) {
       console.error("[v0] Revert error:", error)
       toast({
@@ -266,7 +261,7 @@ export function DocumentsTable({ documents }: DocumentsTableProps) {
                               size="sm"
                               onClick={() => handleApprove(doc.id)}
                               disabled={isLoading === doc.id}
-                              className="transition-all hover:scale-105 bg-gradient-to-r from-[#0D173C] to-[#4ea8de]"
+                              className="transition-all hover:scale-105 bg-gradient-to-r from-[#0D173C] to-[#4ea8de] text-white"
                             >
                               <Check className="h-4 w-4 sm:mr-2" />
                               <span className="hidden sm:inline">Approve</span>

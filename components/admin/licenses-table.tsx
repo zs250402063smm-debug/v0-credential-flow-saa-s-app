@@ -103,8 +103,6 @@ export function LicensesTable({ licenses }: LicensesTableProps) {
         title: "License Verified",
         description: "The license has been successfully verified.",
       })
-
-      router.refresh()
     } catch (error) {
       console.error("[v0] Verify error:", error)
       toast({
@@ -135,8 +133,6 @@ export function LicensesTable({ licenses }: LicensesTableProps) {
         title: "License Reverted",
         description: "The license verification has been reset to pending.",
       })
-
-      router.refresh()
     } catch (error) {
       console.error("[v0] Revert error:", error)
       toast({
@@ -231,7 +227,7 @@ export function LicensesTable({ licenses }: LicensesTableProps) {
                               size="sm"
                               onClick={() => handleVerify(license.id)}
                               disabled={isVerifying === license.id}
-                              className="transition-all hover:scale-105 bg-gradient-to-r from-[#0D173C] to-[#4ea8de]"
+                              className="transition-all hover:scale-105 bg-gradient-to-r from-[#0D173C] to-[#4ea8de] text-white"
                             >
                               <CheckCircle className="h-4 w-4 sm:mr-2" />
                               <span className="hidden sm:inline">Verify</span>
