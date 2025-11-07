@@ -1,6 +1,26 @@
 import { createBrowserClient } from "@/lib/supabase/client"
 import type { RealtimeChannel } from "@supabase/supabase-js"
 
+export function subscribeToProviderLinks(companyId: string, callback: (payload: any) => void): RealtimeChannel {
+  const supabase = createBrowserClient()
+
+  const channel = supabase
+    .channel(`provider-links-${companyId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "provider_company_links",
+        filter: `company_id=eq.${companyId}`,
+      },
+      callback,
+    )
+    .subscribe()
+
+  return channel
+}
+
 export function subscribeToProviders(companyId: string, callback: (payload: any) => void): RealtimeChannel {
   const supabase = createBrowserClient()
 
