@@ -18,14 +18,7 @@ export async function POST(request: Request) {
 
     if (!link) throw new Error("Link not found")
 
-    const { error } = await supabase
-      .from("provider_company_links")
-      .update({
-        status: "rejected",
-        rejected_at: new Date().toISOString(),
-        rejected_by: user.id,
-      })
-      .eq("id", requestId)
+    const { error } = await supabase.from("provider_company_links").delete().eq("id", requestId)
 
     if (error) throw error
 
@@ -34,10 +27,10 @@ export async function POST(request: Request) {
       action_type: "reject_request",
       target_id: link.provider_id,
       company_id: link.company_id,
-      notes: `Rejected provider access request`,
+      notes: `Rejected and deleted provider access request`,
     })
 
-    console.log("[v0] Request rejected successfully")
+    console.log("[v0] Request rejected and deleted successfully")
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

@@ -93,8 +93,9 @@ export function CompanyManagement({
           status,
           requested_at,
           request_note,
-          provider:provider_id (
+          provider:providers!provider_company_links_provider_id_fkey (
             id,
+            user_id,
             profiles:user_id (
               email,
               full_name
@@ -115,8 +116,9 @@ export function CompanyManagement({
           company_id,
           status,
           approved_at,
-          provider:provider_id (
+          provider:providers!provider_company_links_provider_id_fkey (
             id,
+            user_id,
             profiles:user_id (
               email,
               full_name
@@ -131,7 +133,12 @@ export function CompanyManagement({
       if (pending) {
         setPendingRequests(
           pending.map((req: any) => ({
-            ...req,
+            id: req.id,
+            provider_id: req.provider_id,
+            company_id: req.company_id,
+            status: req.status,
+            requested_at: req.requested_at,
+            request_note: req.request_note,
             provider: {
               id: req.provider.id,
               email: req.provider.profiles?.email || "",
@@ -144,7 +151,11 @@ export function CompanyManagement({
       if (approved) {
         setApprovedProviders(
           approved.map((prov: any) => ({
-            ...prov,
+            id: prov.id,
+            provider_id: prov.provider_id,
+            company_id: prov.company_id,
+            status: prov.status,
+            approved_at: prov.approved_at,
             provider: {
               id: prov.provider.id,
               email: prov.provider.profiles?.email || "",
@@ -255,6 +266,23 @@ export function CompanyManagement({
     }
   }
 
+  const handleRevertApproval = async (linkId: string) => {
+    try {
+      const response = await fetch("/api/companies/revert-approval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ linkId }),
+      })
+
+      if (!response.ok) throw new Error("Failed to revert approval")
+
+      toast.success("Provider approval reverted to pending")
+    } catch (error) {
+      console.error("[v0] Error reverting approval:", error)
+      toast.error("Failed to revert approval")
+    }
+  }
+
   if (!company) {
     return (
       <div className="container max-w-4xl mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
@@ -358,15 +386,27 @@ export function CompanyManagement({
                     Approved {new Date(provider.approved_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Button
-                  onClick={() => handleRemoveProviderClick(provider.id, provider.provider.full_name || "this provider")}
-                  size="sm"
-                  variant="destructive"
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  <UserX className="h-4 w-4 mr-2" />
-                  Remove
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleRevertApproval(provider.id)}
+                    size="sm"
+                    variant="outline"
+                    className="border-yellow-600 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-950"
+                  >
+                    Revert to Pending
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      handleRemoveProviderClick(provider.id, provider.provider.full_name || "this provider")
+                    }
+                    size="sm"
+                    variant="destructive"
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <UserX className="h-4 w-4 mr-2" />
+                    Remove
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
