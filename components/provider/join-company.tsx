@@ -49,18 +49,11 @@ export function JoinCompany({
 
     setLoading(true)
     try {
-      console.log("[v0] Submitting join request with note:", {
-        enrollmentCode: enrollmentCode.toUpperCase(),
-        providerId,
-        hasNote: !!requestNote.trim(),
-      })
-
       const response = await fetch("/api/companies/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enrollmentCode: enrollmentCode.toUpperCase(),
-          providerId,
           requestNote: requestNote.trim() || null,
         }),
       })

@@ -14,7 +14,7 @@ import Link from "next/link"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 
 interface AddLicenseProps {
-  providerId: string
+  providerId?: string
 }
 
 type Company = {
@@ -36,15 +36,27 @@ export function AddLicense({ providerId }: AddLicenseProps) {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("")
   const [approvedCompanies, setApprovedCompanies] = useState<Company[]>([])
   const [loadingCompanies, setLoadingCompanies] = useState(true)
+  const [localProviderId, setLocalProviderId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchApprovedCompanies = async () => {
       const supabase = createClient()
       try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) throw new Error("Not authenticated")
+
+        const { data: provider } = await supabase.from("providers").select("id").eq("user_id", user.id).single()
+
+        if (!provider) throw new Error("Provider profile not found")
+
+        setLocalProviderId(provider.id)
+
         const { data: links, error } = await supabase
           .from("provider_company_links")
           .select("company_id, companies(id, name)")
-          .eq("provider_id", providerId)
+          .eq("provider_id", provider.id)
           .eq("status", "approved")
 
         if (error) throw error
@@ -87,7 +99,7 @@ export function AddLicense({ providerId }: AddLicenseProps) {
 
     try {
       const { error } = await supabase.from("licenses").insert({
-        provider_id: providerId,
+        provider_id: localProviderId || providerId,
         company_id: selectedCompanyId,
         license_number: formData.license_number,
         license_type: formData.license_type,

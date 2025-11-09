@@ -37,22 +37,34 @@ export function ProviderOnboarding({ userId }: ProviderOnboardingProps) {
     const supabase = createClient()
 
     try {
-      const { error } = await supabase.from("providers").insert({
-        user_id: userId,
-        npi: formData.npi,
-        specialty: formData.specialty,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zip: formData.zip,
-        status: "pending",
-      })
+      console.log("[v0] Creating provider with user_id:", userId)
 
-      if (error) throw error
+      const { data: newProvider, error } = await supabase
+        .from("providers")
+        .insert({
+          user_id: userId,
+          npi: formData.npi,
+          specialty: formData.specialty,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+          status: "pending",
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error("[v0] Error creating provider:", error)
+        throw error
+      }
+
+      console.log("[v0] Provider created successfully:", newProvider)
 
       router.push("/provider")
     } catch (error: unknown) {
+      console.error("[v0] Provider onboarding error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)

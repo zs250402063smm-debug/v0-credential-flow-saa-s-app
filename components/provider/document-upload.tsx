@@ -38,10 +38,19 @@ export function DocumentUpload({ providerId }: DocumentUploadProps) {
     const fetchApprovedCompanies = async () => {
       const supabase = createClient()
       try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) throw new Error("Not authenticated")
+
+        const { data: provider } = await supabase.from("providers").select("id").eq("user_id", user.id).single()
+
+        if (!provider) throw new Error("Provider profile not found")
+
         const { data: links, error } = await supabase
           .from("provider_company_links")
           .select("company_id, companies(id, name)")
-          .eq("provider_id", providerId)
+          .eq("provider_id", provider.id)
           .eq("status", "approved")
 
         if (error) throw error

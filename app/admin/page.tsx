@@ -14,19 +14,12 @@ export default async function AdminPage() {
     redirect("/auth/login")
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from("profiles").select("role, company_id").eq("id", user.id).single()
+  const { data: company } = await supabase.from("companies").select("id, name").eq("admin_id", user.id).single()
 
-  if (profile?.role !== "admin") {
-    redirect("/provider")
-  }
-
-  // If admin doesn't have a company, redirect to company setup
-  if (!profile.company_id) {
+  if (!company) {
     redirect("/admin/company")
   }
 
-  // Fetch providers through provider_company_links
   const { data: providerLinks } = await supabase
     .from("provider_company_links")
     .select(`
@@ -40,21 +33,23 @@ export default async function AdminPage() {
         status,
         user_id,
         profiles:user_id (
+          id,
           full_name,
           email
         )
       )
     `)
-    .eq("company_id", profile.company_id)
+    .eq("company_id", company.id)
     .eq("status", "approved")
 
-  // Transform provider links to match expected format
   const providers =
-    providerLinks?.map((link) => ({
-      ...link.providers,
-      link_status: link.status,
-      approved_at: link.approved_at,
-    })) || []
+    providerLinks
+      ?.filter((link) => link.providers)
+      .map((link) => ({
+        ...link.providers,
+        link_status: link.status,
+        approved_at: link.approved_at,
+      })) || []
 
   const { data: documents } = await supabase
     .from("documents")
@@ -63,13 +58,14 @@ export default async function AdminPage() {
       providers:provider_id (
         npi,
         specialty,
+        user_id,
         profiles:user_id (
           full_name,
           email
         )
       )
     `)
-    .eq("company_id", profile.company_id)
+    .eq("company_id", company.id)
 
   const { data: licenses } = await supabase
     .from("licenses")
@@ -78,21 +74,22 @@ export default async function AdminPage() {
       providers:provider_id (
         npi,
         specialty,
+        user_id,
         profiles:user_id (
           full_name,
           email
         )
       )
     `)
-    .eq("company_id", profile.company_id)
+    .eq("company_id", company.id)
 
   return (
     <AdminDashboard
-      providers={providers || []}
+      providers={providers}
       documents={documents || []}
       licenses={licenses || []}
       userEmail={user.email || ""}
-      companyId={profile.company_id}
+      companyId={company.id}
     />
   )
 }

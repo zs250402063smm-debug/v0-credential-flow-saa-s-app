@@ -10,15 +10,15 @@ type ErrorResponse = {
 
 export async function POST(request: Request) {
   try {
-    const { enrollmentCode, providerId, requestNote } = await request.json()
+    const { enrollmentCode, requestNote } = await request.json()
 
     const normalizedCode = enrollmentCode?.trim().toUpperCase()
 
-    if (!normalizedCode || !providerId) {
+    if (!normalizedCode) {
       return NextResponse.json<ErrorResponse>(
         {
           error: {
-            message: "Enrollment code and provider ID are required",
+            message: "Enrollment code is required",
             code: "MISSING_FIELDS",
           },
         },
@@ -38,23 +38,61 @@ export async function POST(request: Request) {
       )
     }
 
-    const adminClient = createAdminClient()
+    const supabase = await createClient()
 
-    console.log("[v0] Looking up company with code:", normalizedCode)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: {
+            message: "Unauthorized",
+            code: "UNAUTHORIZED",
+          },
+        },
+        { status: 401 },
+      )
+    }
+
+    const { data: provider, error: providerError } = await supabase
+      .from("providers")
+      .select("id, user_id, status")
+      .eq("user_id", user.id)
+      .single()
+
+    if (providerError || !provider) {
+      console.error("[v0] Provider lookup failed:", {
+        userId: user.id,
+        error: providerError,
+        provider,
+      })
+      return NextResponse.json<ErrorResponse>(
+        {
+          error: {
+            message: "Provider profile not found. Please complete onboarding first.",
+            code: "NO_PROVIDER_PROFILE",
+          },
+        },
+        { status: 404 },
+      )
+    }
+
+    console.log("[v0] Found provider:", {
+      providerId: provider.id,
+      userId: provider.user_id,
+      status: provider.status,
+    })
+
+    const adminClient = createAdminClient()
 
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("*")
       .eq("enrollment_code", normalizedCode)
       .maybeSingle()
-
-    console.log("[v0] Company lookup result:", {
-      found: !!company,
-      companyId: company?.id,
-      companyName: company?.name,
-      adminId: company?.admin_id,
-      error: companyError?.message,
-    })
 
     if (companyError) {
       console.error("[v0] Database error:", companyError)
@@ -81,21 +119,12 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = await createClient()
-
-    console.log("[v0] Checking for existing link")
-
     const { data: existingLink, error: existingError } = await supabase
       .from("provider_company_links")
       .select("*")
-      .eq("provider_id", providerId)
+      .eq("provider_id", provider.id)
       .eq("company_id", company.id)
       .maybeSingle()
-
-    console.log("[v0] Existing link check:", {
-      exists: !!existingLink,
-      status: existingLink?.status,
-    })
 
     if (existingError) {
       console.error("[v0] Error checking existing link:", existingError)
@@ -129,17 +158,16 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log("[v0] Creating new link with request note:", {
-      providerId,
-      companyId: company.id,
-      adminId: company.admin_id,
-      hasNote: !!requestNote,
+    console.log("[v0] Creating provider_company_link:", {
+      provider_id: provider.id,
+      company_id: company.id,
+      status: "pending",
     })
 
     const { data: link, error: linkError } = await supabase
       .from("provider_company_links")
       .insert({
-        provider_id: providerId,
+        provider_id: provider.id,
         company_id: company.id,
         status: "pending",
         request_note: requestNote || null,
@@ -147,24 +175,24 @@ export async function POST(request: Request) {
       .select()
       .single()
 
-    console.log("[v0] Link creation result:", {
-      success: !!link,
-      linkId: link?.id,
-      requestNote: link?.request_note,
-    })
-
     if (linkError) {
-      console.error("[v0] Error creating link:", linkError)
+      console.error("[v0] Error creating link:", {
+        error: linkError,
+        provider_id: provider.id,
+        company_id: company.id,
+      })
       return NextResponse.json<ErrorResponse>(
         {
           error: {
-            message: "Failed to create join request. Please try again.",
+            message: `Failed to create join request: ${linkError.message}`,
             code: "CREATE_FAILED",
           },
         },
         { status: 500 },
       )
     }
+
+    console.log("[v0] Successfully created link:", link)
 
     const response = {
       ...link,

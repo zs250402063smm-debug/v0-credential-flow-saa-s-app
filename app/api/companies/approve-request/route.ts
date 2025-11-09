@@ -11,9 +11,17 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
     if (!user) throw new Error("Unauthorized")
 
-    console.log("[v0] Approving request:", { requestId, providerId, companyId, adminId: user.id })
+    const { data: providerCheck, error: providerCheckError } = await supabase
+      .from("providers")
+      .select("id")
+      .eq("id", providerId)
+      .single()
 
-    // Update link status
+    if (providerCheckError || !providerCheck) {
+      console.error("[v0] Provider not found:", { providerId, error: providerCheckError })
+      return NextResponse.json({ error: "Provider not found. They may need to complete onboarding." }, { status: 404 })
+    }
+
     const { data: updatedLink, error: linkError } = await supabase
       .from("provider_company_links")
       .update({
@@ -27,17 +35,7 @@ export async function POST(request: Request) {
 
     if (linkError) throw linkError
 
-    // Create or update provider record with company_id
-    const { data: existingProvider } = await supabase
-      .from("providers")
-      .select("*")
-      .eq("user_id", providerId)
-      .maybeSingle()
-
-    if (existingProvider) {
-      // Update existing provider with company_id
-      await supabase.from("providers").update({ company_id: companyId, status: "active" }).eq("user_id", providerId)
-    }
+    await supabase.from("providers").update({ status: "active" }).eq("id", providerId)
 
     await supabase.from("admin_action_logs").insert({
       admin_id: user.id,
@@ -46,8 +44,6 @@ export async function POST(request: Request) {
       company_id: companyId,
       notes: `Approved provider access request`,
     })
-
-    console.log("[v0] Request approved successfully")
 
     return NextResponse.json(updatedLink)
   } catch (error: any) {
