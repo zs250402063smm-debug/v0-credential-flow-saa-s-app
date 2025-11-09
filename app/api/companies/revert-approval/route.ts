@@ -37,9 +37,6 @@ export async function POST(request: Request) {
 
     if (updateError) throw updateError
 
-    // Update provider status back to pending
-    await supabase.from("providers").update({ status: "pending" }).eq("id", link.provider_id)
-
     // Log the action
     await supabase.from("admin_action_logs").insert({
       admin_id: user.id,

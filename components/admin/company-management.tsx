@@ -207,6 +207,7 @@ export function CompanyManagement({
   }
 
   const handleApproveRequest = async (requestId: string, providerId: string) => {
+    console.log("[v0] Approving request:", { requestId, providerId, companyId: company?.id })
     try {
       const response = await fetch("/api/companies/approve-request", {
         method: "POST",
@@ -214,16 +215,22 @@ export function CompanyManagement({
         body: JSON.stringify({ requestId, providerId, companyId: company?.id }),
       })
 
-      if (!response.ok) throw new Error("Failed to approve request")
+      const data = await response.json()
+      console.log("[v0] Approve response:", data)
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to approve request")
+      }
 
       toast.success("Provider request approved!")
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error approving request:", error)
-      toast.error("Failed to approve request")
+      toast.error(error.message || "Failed to approve request")
     }
   }
 
   const handleRejectRequest = async (requestId: string) => {
+    console.log("[v0] Rejecting request:", { requestId })
     try {
       const response = await fetch("/api/companies/reject-request", {
         method: "POST",
@@ -231,12 +238,17 @@ export function CompanyManagement({
         body: JSON.stringify({ requestId }),
       })
 
-      if (!response.ok) throw new Error("Failed to reject request")
+      const data = await response.json()
+      console.log("[v0] Reject response:", data)
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to reject request")
+      }
 
       toast.success("Provider request rejected")
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error rejecting request:", error)
-      toast.error("Failed to reject request")
+      toast.error(error.message || "Failed to reject request")
     }
   }
 
@@ -267,6 +279,7 @@ export function CompanyManagement({
   }
 
   const handleRevertApproval = async (linkId: string) => {
+    console.log("[v0] Reverting approval:", { linkId })
     try {
       const response = await fetch("/api/companies/revert-approval", {
         method: "POST",
@@ -274,12 +287,17 @@ export function CompanyManagement({
         body: JSON.stringify({ linkId }),
       })
 
-      if (!response.ok) throw new Error("Failed to revert approval")
+      const data = await response.json()
+      console.log("[v0] Revert response:", data)
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to revert approval")
+      }
 
       toast.success("Provider approval reverted to pending")
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error reverting approval:", error)
-      toast.error("Failed to revert approval")
+      toast.error(error.message || "Failed to revert approval")
     }
   }
 
@@ -445,7 +463,12 @@ export function CompanyManagement({
                       <UserCheck className="h-4 w-4 mr-2" />
                       Approve
                     </Button>
-                    <Button onClick={() => handleRejectRequest(request.id)} size="sm" variant="destructive">
+                    <Button
+                      onClick={() => handleRejectRequest(request.id)}
+                      size="sm"
+                      variant="destructive"
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
                       <UserX className="h-4 w-4 mr-2" />
                       Reject
                     </Button>
