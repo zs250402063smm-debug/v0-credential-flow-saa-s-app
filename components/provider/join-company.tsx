@@ -49,6 +49,11 @@ export function JoinCompany({
 
     setLoading(true)
     try {
+      console.log("[v0] Sending join request:", {
+        enrollmentCode: enrollmentCode.toUpperCase(),
+        hasNote: !!requestNote.trim(),
+      })
+
       const response = await fetch("/api/companies/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,10 +64,13 @@ export function JoinCompany({
       })
 
       const data = await response.json()
+      console.log("[v0] Join request response:", { status: response.status, data })
 
       if (!response.ok) {
-        const errorMessage = data.error?.message || data.error || "Failed to join company"
-        throw new Error(errorMessage)
+        const errorMessage = data.error?.message || data.message || "Failed to join company"
+        console.error("[v0] Join request failed:", errorMessage)
+        toast.error(errorMessage)
+        return
       }
 
       setLinks([...links, data])
@@ -70,7 +78,8 @@ export function JoinCompany({
       setRequestNote("")
       toast.success("Join request sent successfully! Waiting for admin approval.")
     } catch (error: any) {
-      toast.error(error.message || "Failed to join company")
+      console.error("[v0] Join request error:", error)
+      toast.error(error.message || "Failed to join company. Please try again.")
     } finally {
       setLoading(false)
     }
