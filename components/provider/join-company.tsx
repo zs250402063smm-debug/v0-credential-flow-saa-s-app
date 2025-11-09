@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -35,6 +35,10 @@ export function JoinCompany({
   const [requestNote, setRequestNote] = useState("")
   const [loading, setLoading] = useState(false)
   const [links, setLinks] = useState(initialLinks)
+
+  useEffect(() => {
+    console.log("[v0] JoinCompany received links:", links)
+  }, [links])
 
   const handleJoinCompany = async () => {
     if (!enrollmentCode.trim()) {
@@ -179,20 +183,23 @@ export function JoinCompany({
           <p className="text-muted-foreground text-center py-8">You haven't joined any companies yet</p>
         ) : (
           <div className="space-y-4">
-            {links.map((link) => (
-              <div
-                key={link.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border bg-card hover-lift"
-              >
-                <div className="space-y-1">
-                  <p className="font-medium">{link.company.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Requested {new Date(link.requested_at).toLocaleDateString()}
-                  </p>
+            {links.map((link) => {
+              console.log("[v0] Rendering link:", link)
+              return (
+                <div
+                  key={link.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border bg-card hover-lift"
+                >
+                  <div className="space-y-1">
+                    <p className="font-medium">{link.company?.name || "Unknown Company"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Requested {new Date(link.requested_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {getStatusBadge(link.status)}
                 </div>
-                {getStatusBadge(link.status)}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>
